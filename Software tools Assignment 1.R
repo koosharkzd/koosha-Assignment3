@@ -1,166 +1,55 @@
-#Assignment 1
-#Alignment; western and eastern monarch butterfly  
-# Loading the Biostrings package
-library(Biostrings)
-# DNA sequences from both west and east monarchs 
-seq_west <- DNAString("TATATTTTATTTTTGGAATTTGAGCAGGAATAGTTGGGACATCTTTAAGTCTTTTAATTCGAACAGAATTAGGAACTCCTGGATCTTTAATTGGTGATGATCAAATTTATAATACTATTGTTACAGCTCATGCTTTTATTATAATTTTTTTTATAGTTATACCAATTATAATTGGAGGATTTGGTAATTGATTAGTACCCCTAATATTAGGAGCTCCTGATATAGCTTTCCCCCGAATAAATAATATAAGATTTTGACTTTTACCCCCATCATTAATTTTATTAATTTCAAGAAGAATCGTAGAAAATGGTGCAGGAACAGGATGAACAGTTTACCCCCCACTTTCATCAAATATTGCTCATAGAGGATCTTCTGTAGATCTAGCTATTTTTTCTTTACATTTAGCTGGAATTTCATCTATTTTAGGAGCTATTAATTTTATTACTACAATCTTAAATATACGAATTAATAATATAACATTTGATCAAATACCTTTATTTGTTTGAGCAGTAGGTATTACAGCTCTTCTTTTATTACTTTCTTTACCAGTTTTAGCAGGAGCAATTACTATACTTCTTACTGATCGAAATTTAAATACTTCTTTTTTTGATCCTGCTGGTGGAGGAGACCCTATTTTATATCAACATTTATTT")
+# Load all required libraries at the beginning
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install("Biostrings")
 
+library(Biostrings)
+library(pwalign)
+library(stats)
+library(tidyverse)
+library(viridis)
+library(dplyr)
+library(ggplot2)
+library(rnaturalearth)
+library(sf)
+
+# Assignment 1
+# Alignment; Western and Eastern Monarch Butterflies
+
+# DNA Sequences for Western and Eastern Monarchs
+seq_west <- DNAString("TATATTTTATTTTTGGAATTTGAGCAGGAATAGTTGGGACATCTTTAAGTCTTTTAATTCGAACAGAATTAGGAACTCCTGGATCTTTAATTGGTGATGATCAAATTTATAATACTATTGTTACAGCTCATGCTTTTATTATAATTTTTTTTATAGTTATACCAATTATAATTGGAGGATTTGGTAATTGATTAGTACCCCTAATATTAGGAGCTCCTGATATAGCTTTCCCCCGAATAAATAATATAAGATTTTGACTTTTACCCCCATCATTAATTTTATTAATTTCAAGAAGAATCGTAGAAAATGGTGCAGGAACAGGATGAACAGTTTACCCCCCACTTTCATCAAATATTGCTCATAGAGGATCTTCTGTAGATCTAGCTATTTTTTCTTTACATTTAGCTGGAATTTCATCTATTTTAGGAGCTATTAATTTTATTACTACAATCTTAAATATACGAATTAATAATATAACATTTGATCAAATACCTTTATTTGTTTGAGCAGTAGGTATTACAGCTCTTCTTTTATTACTTTCTTTACCAGTTTTAGCAGGAGCAATTACTATACTTCTTACTGATCGAAATTTAAATACTTCTTTTTTTGATCCTGCTGGTGGAGGAGACCCTATTTTATATCAACATTTATTT")
 seq_east <- DNAString("TACTTTATATTTTATTTTTGGAATTTGAGCAGGAATAGTTGGGACATCTTTAAGTCTTTTAATTCGAACAGAATTAGGAACTCCTGGATCTTTAATTGGTGATGATCAAATTTATAATACTATTGTTACAGCTCATGCTTTTATTATAATTTTTTTTATAGTTATACCAATTATAATTGGAGGATTTGGTAATTGATTAGTACCCCTAATATTAGGAGCTCCTGATATAGCTTTCCCCCGAATAAATAATATAAGATTTTGACTTTTACCCCCATCATTAATTTTATTAATTTCAAGAAGAATCGTAGAAAATGGTGCAGGAACAGGATGAACAGTTTACCCCCCACTTTCATCAAATATTGCTCATAGAGGATCTTCTGTAGATCTAGCTATTTTTTCTTTACATTTAGCTGGAATTTCATCTATTTTAGGAGCTATTAATTTTATTACTACAATCTTAAATATACGAATTAATAATATAACATTTGATCAAATACCTTTATTTGTTTGAGCAGTAGGTATTACAGCTCTTCTTTTATTACTTTCTTTACCAGTTTTAGCAGGAGCAATTACTATACTTCTTACTGATCGAAATTTAAATACTTCTTTTTTTGATCCTGCTGGTGGAGGAGACCCTATTTTATATCAACATTTATTT")
 
-# Global alignment; that begins from beginning to the end
+# Global alignment of sequences
 global_alignment <- pwalign::pairwiseAlignment(seq_west, seq_east, type = "global")
 print(global_alignment)
 
-# Obtaining data from monarch butterflies .tsv file 
-# Load necessary libraries
-library(stats)
-library(tidyverse)
-library(viridis)
-library(dplyr)
-library(ggplot2)
-library(rnaturalearth)
-library(sf)
-
 # Load the monarch butterflies data from the .tsv file
-monarch_data <- read.delim(file = "./data/denaus.tsv", header = TRUE, sep = "\t")
+monarch_data <- read.delim(file = "C:/Users/dhruv/OneDrive/Desktop/assignment3.6210/data/Denaus.tsv", header = TRUE, sep = "\t")
 
-# Check the structure of the data to understand available columns
-str(monarch_data)
+# Data Cleaning and Categorization
+monarch_data_clean <- monarch_data %>%
+  drop_na(lon, lat) %>%  # Removes rows with missing coordinates
+  mutate(region = ifelse(lon < -100, "Western", "Eastern"))  # Categorize butterflies by longitude
 
-# Explore key variables
-summary(monarch_data)
+# Summarize Data by Region
+summary_data <- monarch_data_clean %>%
+  group_by(region) %>%
+  summarise(count = n(), avg_lat = mean(lat), avg_lon = mean(lon))
+print(summary_data)
 
-# Check for missing values in longitude and latitude columns
-sum(is.na(monarch_data$lon))  # Check missing longitude
-sum(is.na(monarch_data$lat))  # Check missing latitude
+# Improved Statistical Test: T-test to Compare Latitude Distributions Between Regions
+# Conducting a t-test to see if there’s a significant difference in latitude between Eastern and Western monarchs
+latitude_ttest <- t.test(lat ~ region, data = monarch_data_clean)
+print(latitude_ttest)
 
-# Remove rows with missing longitude or latitude
-monarch_data_clean <- monarch_data[!is.na(monarch_data$lon) & !is.na(monarch_data$lat), ]
-
-# Load natural earth data for country boundaries
-world <- ne_countries(scale = "medium", returnclass = "sf")
-
-
-# Ensure the column names ('lon', 'lat') match those in my data
-monarch_data_sf <- st_as_sf(monarch_data_clean, coords = c("lon", "lat"), crs = 4326)
-
-# Perform a spatial join to get the country information for each butterfly
-joined_data <- st_join(monarch_data_sf, world["name"])
-
-
-# Visualization 
-# Open a PNG device for the whole world plot
-png("./data/plot1.png", width = 3000, height = 1800, res = 300)
-
-# Create a world map
+# Visualization 1: Geographical Distribution of Monarch Butterflies Worldwide
 ggplot() +
-  geom_sf(data = world, fill = "lightblue") +  # Base map
-  geom_sf(data = joined_data, aes(color = name), size = 2, alpha = 0.6) +
-  labs(title = "Geographical Distribution of Monarch Butterflies Worldwide",
-       color = "Country") +
+  geom_sf(data = ne_countries(scale = "medium", returnclass = "sf"), fill = "lightblue") +  # Base map
+  geom_sf(data = st_as_sf(monarch_data_clean, coords = c("lon", "lat"), crs = 4326), aes(color = region), size = 2, alpha = 0.6) +
+  labs(title = "Geographical Distribution of Monarch Butterflies Worldwide", color = "Region") +
   theme_minimal()
-dev.off()
 
-#Exploring North America 
-# Load necessary libraries
-library(stats)
-library(tidyverse)
-library(viridis)
-library(dplyr)
-library(ggplot2)
-library(rnaturalearth)
-library(sf)
-
-# Load the monarch butterflies data from the .tsv file
-monarch_data <- read.delim(file = "./data/denaus.tsv", header = TRUE, sep = "\t")
-
-# Check the structure of the data to understand available columns
-str(monarch_data)
-
-# Explore key variables
-summary(monarch_data)
-
-# Display the first few rows of the dataset
-head(monarch_data)
-
-# Check for missing values in longitude and latitude columns
-sum(is.na(monarch_data$lon))  # Check missing longitude
-sum(is.na(monarch_data$lat))  # Check missing latitude
-
-# Remove rows with missing longitude or latitude
-monarch_data_clean <- monarch_data[!is.na(monarch_data$lon) & !is.na(monarch_data$lat), ]
-
-# Load natural earth data for country boundaries
-world <- ne_countries(scale = "medium", returnclass = "sf")
-
-# Convert monarch data to a spatial object using longitude and latitude
-monarch_data_sf <- st_as_sf(monarch_data_clean, coords = c("lon", "lat"), crs = 4326)
-
-# Perform a spatial join to get the country information for each butterfly
-joined_data <- st_join(monarch_data_sf, world["name"])
-
-# Visualization for North America
-png("./data/monarch_distribution_north_america.png", width = 3000, height = 1800, res = 300)
-
-# Create a map for North America
-ggplot() +
-  geom_sf(data = world[world$name %in% c("United States of America", "Canada", "Mexico"), ], fill = "lightgray") +  # Base map for North America
-  geom_sf(data = joined_data[joined_data$name %in% c("United States of America", "Canada", "Mexico"), ], 
-          aes(color = name), size = 1, alpha = 0.6) +
-  labs(title = "Geographical Distribution of Monarch Butterflies in North America",
-       color = "Country") +
-  theme_minimal()
-dev.off()
-
-
-# Filter data for each country
-us_data <- joined_data[joined_data$name == "United States of America", ]
-canada_data <- joined_data[joined_data$name == "Canada", ]
-mexico_data <- joined_data[joined_data$name == "Mexico", ]
-
-# Visualization: Distribution in the United States
-png("./data/monarch_distribution_us.png", width = 2500, height = 1800, res = 300)
-ggplot() +
-  geom_sf(data = world[world$name == "United States of America", ], fill = "lightgray") +  # Base map for the USA
-  geom_sf(data = us_data, aes(color = name), size = 3, alpha = 0.6) +
-  labs(title = "Geographical Distribution of Monarch Butterflies in the United States of America",
-       color = "Country") +
-  theme_minimal()
-dev.off()
-
-# Visualization: Distribution in Canada
-png("./data/monarch_distribution_canada.png", width = 3000, height = 1800, res = 300)
-ggplot() +
-  geom_sf(data = world[world$name == "Canada", ], fill = "lightblue") +  # Base map for Canada
-  geom_sf(data = canada_data, aes(color = name), size = 3, alpha = 0.6) +
-  labs(title = "Geographical Distribution of Monarch Butterflies in Canada",
-       color = "Country") +
-  theme_minimal()
-dev.off()
-
-# Visualization: Distribution in Mexico
-png("./data/monarch_distribution_mexico.png", width = 3000, height = 1800, res = 300)
-ggplot() +
-  geom_sf(data = world[world$name == "Mexico", ], fill = "lightblue") +  # Base map for Mexico
-  geom_sf(data = mexico_data, aes(color = name), size = 3, alpha = 0.6) +
-  labs(title = "Geographical Distribution of Monarch Butterflies in Mexico",
-       color = "Country") +
-  theme_minimal()
-dev.off()
-
-
-# Add a column to categorize monarch butterflies based on their geographic location (Longitude and Latitude)
-monarch_data_clean <- monarch_data_clean %>%
-  mutate(region = case_when(
-    lon < -100 ~ "Western",   # Longitude less than -100 for Western Monarchs
-    lon >= -100 ~ "Eastern"   # Longitude greater than or equal to -100 for Eastern Monarchs
-  ))
-
-# Check the first few rows to confirm the categorization
-head(monarch_data_clean)
-
-# Visualization: Eastern vs Western Monarchs
-png("./data/monarch_east_west_comparison.png", width = 3000, height = 1800, res = 300)
+# Visualization 2: Comparison of Eastern and Western Monarch Butterflies
 ggplot(monarch_data_clean, aes(x = lon, y = lat, color = region)) +
   geom_point(alpha = 0.6) +
   facet_wrap(~region) +
@@ -171,39 +60,56 @@ ggplot(monarch_data_clean, aes(x = lon, y = lat, color = region)) +
     color = "Region"
   ) +
   theme_minimal()
-dev.off()
 
-#Novel Question; Why Western monarchs are less than Eastern?
-# Obtaining data from monarch butterflies .tsv file 
-# Load necessary libraries
-library(tidyverse)
-# Load the monarch butterflies data from the .tsv file
-# Ensure the file path is correct, replace './data/west.tsv' with the actual path if needed
-west_data <- read.delim(file = "./data/denaus.tsv", header = TRUE, sep = "\t")
+# Visualization 3: Latitude Density for Eastern and Western Monarchs
+ggplot(monarch_data_clean, aes(x = lat, fill = region)) +
+  geom_density(alpha = 0.6) +
+  labs(
+    title = "Latitude Density of Eastern and Western Monarch Butterflies",
+    x = "Latitude",
+    y = "Density",
+    fill = "Region"
+  ) +
+  theme_minimal()
 
-
-# Filter the data for park and forest habitats, removing rows with missing habitat values
-filtered_data <- west_data %>%
+# Visualization 4: Habitat Comparison - Park vs. Forest for Western Monarchs
+# Filtering for park and forest habitats
+filtered_data <- monarch_data_clean %>%
   filter(!is.na(habitat) & habitat %in% c("Park", "Forest"))
 
+# Bar plot comparing Western Monarch Butterflies in parks and forests
+ggplot(filtered_data, aes(x = habitat, fill = habitat)) +
+  geom_bar() +
+  labs(
+    title = "Comparison of Western Monarch Butterflies in Parks and Forests",
+    x = "Habitat Type",
+    y = "Total Butterflies"
+  ) +
+  scale_fill_manual(values = c("blue", "red")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5))
+# Major Edit: Detailed Habitat Analysis for Eastern and Western Monarchs
+# Filtering and grouping data to analyze habitat preferences within each region
+habitat_analysis <- monarch_data_clean %>%
+  filter(!is.na(habitat)) %>%
+  group_by(region, habitat) %>%
+  summarise(total_butterflies = n()) %>%
+  arrange(region, desc(total_butterflies))
 
-# Count the number of butterflies in each habitat
-habitat_comparison <- filtered_data %>%
-  group_by(habitat) %>%
-  summarise(total_butterflies = n())  # Count total butterflies for each habitat
+# Print summarized habitat data for review
+print(habitat_analysis)
 
-# View the comparison
-print(habitat_comparison)
+# Visualization: Habitat Preferences for Eastern and Western Monarchs
+ggplot(habitat_analysis, aes(x = habitat, y = total_butterflies, fill = region)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Habitat Preferences of Eastern and Western Monarch Butterflies",
+    x = "Habitat Type",
+    y = "Total Butterflies",
+    fill = "Region"
+  ) +
+  scale_fill_manual(values = c("Western" = "blue", "Eastern" = "orange")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-# Bar plot to compare total butterfly counts in park and forest
-png("./data/monarch_density_north_america.png", width = 3000, height = 1800, res = 300)
-ggplot(habitat_comparison, aes(x = habitat, y = total_butterflies, fill = habitat)) + 
-  geom_bar(stat = "identity") + 
-  labs(title = "Comparison of Western Monarch Butterflies in Parks and Forests",
-       x = "Habitat Type",
-       y = "Total Butterflies") +
-  scale_fill_manual(values = c("blue", "red")) +  
-  theme_minimal() + 
-  theme(axis.text.x = element_text(angle = 0, hjust = 0.5))  
-dev.off()
 
