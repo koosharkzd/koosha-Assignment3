@@ -88,4 +88,28 @@ ggplot(filtered_data, aes(x = habitat, fill = habitat)) +
   scale_fill_manual(values = c("blue", "red")) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 0, hjust = 0.5))
+# Major Edit: Detailed Habitat Analysis for Eastern and Western Monarchs
+# Filtering and grouping data to analyze habitat preferences within each region
+habitat_analysis <- monarch_data_clean %>%
+  filter(!is.na(habitat)) %>%
+  group_by(region, habitat) %>%
+  summarise(total_butterflies = n()) %>%
+  arrange(region, desc(total_butterflies))
+
+# Print summarized habitat data for review
+print(habitat_analysis)
+
+# Visualization: Habitat Preferences for Eastern and Western Monarchs
+ggplot(habitat_analysis, aes(x = habitat, y = total_butterflies, fill = region)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Habitat Preferences of Eastern and Western Monarch Butterflies",
+    x = "Habitat Type",
+    y = "Total Butterflies",
+    fill = "Region"
+  ) +
+  scale_fill_manual(values = c("Western" = "blue", "Eastern" = "orange")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
 
